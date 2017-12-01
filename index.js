@@ -1,6 +1,7 @@
 var split = require('split2')
 var pumpify = require('pumpify')
 var through = require('through2')
+var utf8 = require('to-utf-8')
 
 module.exports = function() {
   var re_ass = new RegExp("Dialogue:\\s\\d," + // get time and subtitle
@@ -14,6 +15,7 @@ module.exports = function() {
   var re_newline = /\\n/ig; // replace \N with newline
   var re_style = /\{([^}]+)\}/; // replace style
   var i = 1;
+  var black_list = ['shad'];
   var write = function(line, enc, cb) {
     var m = line.match(re_ass);
     if (!m) {
@@ -30,9 +32,17 @@ module.exports = function() {
         style = style[1].split("\\"); // Get an array of override commands.
         for (var j = 1; j < style.length; j++) {
           var firstLetter = style[j].substring(0,1);
-
+          var support = true;
+          for (var k = 0; k < black_list.length; k++) {
+            if (style[j].startsWith(black_list[k])) {
+              support = false;
+              break;
+            }
+          }
           // "New" position commands. It is assumed that bottom center position is the default.
-          if ( style[j].substring(0,2) === "an" ) {
+          if (!support) {
+            //do nothing
+          } else if ( style[j].substring(0,2) === "an" ) {
             var posNum = Number(style[j].substring(2,3));
             if ( Math.floor((posNum-1)/3) == 1) {
               pos_style += ' line:50%';
@@ -115,6 +125,6 @@ module.exports = function() {
 
   var parse = through.obj(write)
   parse.push('WEBVTT\r\n\r\n')
-  return pumpify(split(), parse)
+  return pumpify(utf8({newline: false, detectSize: 4095}), split(), parse)
 }
 
